@@ -113,6 +113,13 @@ class Studio(unittest.TestCase):
         self.assertEqual(st, 400); self.assertIn("not found", e["error"])
         st, e, _ = self.req("POST", "/api/jobs", {"title": "x", "versions": ["4k"], "max_seconds": 2, "clips_mode": "upload", "music_mode": "upload"})
         self.assertEqual(st, 400); self.assertIn("between", e["error"])
+        # a relative path is resolved now: every step runs inside the job folder, where it would mean nothing
+        rel = os.path.relpath(os.path.join(self.media, "track.wav")) if HAS_FFMPEG else None
+        if rel:
+            st, j, _ = self.req("POST", "/api/jobs", {"title": "x", "versions": ["4k"], "clips_mode": "upload", "music_mode": "path",
+                                                      "music_path": rel, "output_dir": os.path.join(TMP, "o")})
+            self.assertEqual(st, 200, j)
+            self.assertEqual(server.MANAGER.jobs[j["id"]].data["settings"]["music_path"], os.path.join(self.media, "track.wav"))
 
     def test_upload_is_sanitised_and_streamed(self):
         st, j, _ = self.req("POST", "/api/jobs", {"title": "Up", "versions": ["4k"], "clips_mode": "upload", "music_mode": "upload",
@@ -257,6 +264,30 @@ class Studio(unittest.TestCase):
         self.assertEqual([s["clip"] for s in j["cut"]["shots"]], ["0010", "0020", "0030"])
         self.assertIn("dissolve to 0020", j["summary"])
         self.assertIn("claude: Read", j["log"])
+        # the sheet: the shots in film order, numbered as notes refer to them, each with a frame
+        d = os.path.join(jobs.JOBS_DIR, j["id"])
+        film = j["sheet"]["film"]
+        self.assertEqual([(s["n"], s["clip"]) for s in film], [(1, "0010"), (2, "0020"), (3, "0030")])
+        self.assertEqual([s["at"] for s in film], sorted(s["at"] for s in film))
+        self.assertTrue(all(os.path.getsize(os.path.join(d, s["img"])) > 1000 for s in film))
+        self.assertEqual(j["sheet"]["unused"], [])                     # all three clips are in the cut
+        st, img, _ = self.req("GET", "/media/%s/%s" % (j["id"], film[0]["img"]), raw=True)
+        self.assertEqual((st, img[:3]), (200, b"\xff\xd8\xff"))
+        # "Edit again": the numbering is explained, and only the newest note is to be applied
+        os.environ["DRONE_STUDIO_CLAUDE"] = fake_claude(os.path.join(TMP, "claude-good-2"), GOOD)
+        try:
+            for note in ("slower", "replace shot 2 with clip 0030"):
+                self.assertEqual(self.req("POST", "/api/jobs/%s/revise" % j["id"], {"notes": note})[0], 200)
+                j2 = self.wait(j["id"])
+                self.assertEqual(j2["state"], "done", j2.get("error"))
+        finally:
+            del os.environ["DRONE_STUDIO_CLAUDE"]
+        with open(os.path.join(d, "prompt.txt")) as f:
+            prompt = f.read()
+        self.assertIn('"shot N" is the N-th entry of "shots" in cut-spec.json', prompt)
+        self.assertIn("NEW NOTE: replace shot 2 with clip 0030", prompt)
+        self.assertIn("already applied", prompt)
+        self.assertLess(prompt.index("NEW NOTE"), prompt.index("- slower"))
 
     @unittest.skipUnless(HAS_FFMPEG, "ffmpeg missing")
     def test_bad_claude_cut_falls_back(self):

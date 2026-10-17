@@ -15,6 +15,9 @@ python3 studio/server.py            # opens http://127.0.0.1:8765  (--port, --no
   fails or writes a cut that does not pass the checks, the job falls back to Automatic and says so.
 - **Versions:** 16:9 4K, 16:9 1080p, 9:16 short. **Quality:** Best (x264) or Fast (VideoToolbox).
 - **Edit again** re-runs only the edit and the renders with your new notes; unchanged shots come from the cache.
+- **The shot sheet:** after the edit, the page shows the cut as numbered frames in film order (and the short's, and
+  the clips left out). Click one to play from there. In notes, say "shot 4", "short shot 2", or a clip number like
+  0045: Claude reads them against the current cut.
 - **Style:** *Drone film*, or *Real estate* with *Interior & exterior* or *Exterior only* footage. Real estate cuts a
   calm tour (dissolves, 3-6 s shots, no whips) in tour order, can label rooms ("Kitchen"), and ends on a listing card:
   address and city, price, beds · baths · area, agent · brokerage, phone · email · website, and an optional logo

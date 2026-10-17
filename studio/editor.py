@@ -43,6 +43,27 @@ def plan_args(job):
     return args
 
 
+def revision_text(revisions, automatic=False):
+    """The notes for an "Edit again" run. The studio shows the cut as a numbered sheet, so notes say "shot 4": the
+    numbers belong to the cut as it is now, which is why only the newest note is applied and older ones are history."""
+    out = ["This is a revision. The current cut is in cut-spec.json: read it first. Apply the NEW NOTE below and keep "
+           "everything it does not mention.",
+           "How the user refers to things (the studio shows the cut as a numbered sheet):",
+           "- \"shot N\" is the N-th entry of \"shots\" in cut-spec.json as it is now (1 = the first shot of the 16:9 film);",
+           "- \"short shot N\" is the N-th entry of \"vertical\".\"shots\";",
+           "- a four-digit number such as 0045 is a clip id (the sheet also shows the clips the cut does not use).",
+           "", "NEW NOTE: " + revisions[-1]]
+    if automatic:       # the last cut came from the planner: cut-spec.json is an older, rejected spec
+        out[0:1] = ["This is a revision. The current cut was made by the automatic planner and is in cutlist.json (\"shots\", "
+                    "in seconds); cut-spec.json is an older spec that did not pass the checks. Read cutlist.json first, rebuild "
+                    "that cut as a new cut-spec.json in bars, apply the NEW NOTE below and keep everything it does not mention."]
+        out = [x.replace("in cut-spec.json as it is now", "in cutlist.json as it is now") for x in out]
+    if len(revisions) > 1:
+        out += ["", "Earlier notes, already applied (their shot numbers referred to earlier cuts; do not apply them again):"]
+        out += ["- " + r for r in revisions[:-1]]
+    return "\n".join(out)
+
+
 def brief(job):
     """The style-specific part of the prompt: footage, labels, listing."""
     s = job.data["settings"]
@@ -199,8 +220,7 @@ def edit(job):
         "TITLE": s["title"], "SUB": s["sub"] or "(none)",
         "END": cut_config(job)["end"], "END_SUB": cut_config(job)["end_sub"] or "(none)",
         "NOTES": s["notes"] or "(none: use your judgement and the editing rules)",
-        "REVISION": ("This is a revision. The current cut is in cut-spec.json (read it first). Change it according to these notes, "
-                     "newest last, and keep what they do not mention:\n" + "\n".join("- " + r for r in revisions)) if revisions and os.path.exists(spec) else "",
+        "REVISION": revision_text(revisions, job.data.get("editor_used") == "automatic") if revisions and os.path.exists(os.path.join(job.dir, "cutlist.json")) else "",
     }
     for k, v in fill.items():
         prompt = prompt.replace("{{%s}}" % k, v)

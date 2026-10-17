@@ -3,186 +3,211 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>Drone Studio</title>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 <header class="top">
-  <div class="brand"><span class="mark" aria-hidden="true"></span>Drone Studio</div>
-  <div id="checks" class="checks" aria-live="polite"></div>
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+      <path d="M2 24h28" class="mark-horizon"/>
+      <g class="mark-drone"><path d="M10 10l12 8M22 10l-12 8"/><circle cx="10" cy="10" r="3.2"/><circle cx="22" cy="10" r="3.2"/>
+        <circle cx="10" cy="18" r="3.2"/><circle cx="22" cy="18" r="3.2"/><rect x="13.5" y="11.5" width="5" height="5" rx="1.5"/></g>
+    </svg>
+    <span>Drone Studio</span>
+  </div>
+  <p id="checks" class="checks" aria-live="polite"></p>
 </header>
 
 <main class="layout">
-  <form id="form" class="panel form" novalidate>
-    <section class="group">
-      <h2>Style</h2>
-      <div class="seg" role="radiogroup" aria-label="Style">
-        <label><input type="radio" name="style" value="drone" checked><span>Drone film</span></label>
-        <label><input type="radio" name="style" value="realestate"><span>Real estate</span></label>
-      </div>
-      <div data-style="realestate" hidden>
-        <div class="seg" role="radiogroup" aria-label="Footage of the property">
-          <label><input type="radio" name="footage" value="mixed" checked><span>Interior &amp; exterior</span></label>
-          <label><input type="radio" name="footage" value="exterior"><span>Exterior only</span></label>
+  <form id="form" class="plan" novalidate aria-label="Plan the film">
+    <div class="plan-body">
+      <section class="group">
+        <h2>What are you making?</h2>
+        <div class="tiles" role="radiogroup" aria-label="Style">
+          <label class="tile"><input type="radio" name="style" value="drone" checked>
+            <span class="tile-face">
+              <svg viewBox="0 0 64 36" aria-hidden="true"><circle cx="45" cy="12" r="5"/><path d="M2 22h60"/>
+                <path d="M2 28c6-3 10-3 16 0s10 3 16 0 10-3 16 0 8 2 12 1"/><path d="M14 22l9-9 6 5 5-4 9 8"/></svg>
+              <strong>Drone film</strong><span>Travel and landscape, cut to the beat</span>
+            </span></label>
+          <label class="tile"><input type="radio" name="style" value="realestate">
+            <span class="tile-face">
+              <svg viewBox="0 0 64 36" aria-hidden="true"><path d="M2 32h60"/><path d="M14 32V17l13-10 13 10v15"/>
+                <path d="M40 32V21h12v11"/><path d="M38 19l8-6 8 6"/><path d="M23 32v-8h8v8"/><path d="M19 20h4M31 20h4"/></svg>
+              <strong>Real estate</strong><span>A calm tour of a property, with a listing card</span>
+            </span></label>
         </div>
-        <p class="hint" id="footageHint"></p>
-        <label class="check"><input type="checkbox" id="labels" checked><span>Room labels on the first shot of each room</span></label>
-      </div>
-    </section>
-
-    <section class="group">
-      <h2>Footage</h2>
-      <div class="seg" role="radiogroup" aria-label="How to add clips">
-        <label><input type="radio" name="clips_mode" value="upload" checked><span>Upload clips</span></label>
-        <label><input type="radio" name="clips_mode" value="folder"><span>Use a folder</span></label>
-      </div>
-      <div data-mode="clips-upload">
-        <label class="drop" id="clipDrop">
-          <input type="file" id="clipFiles" accept="video/*,.mp4,.mov,.m4v,.mxf" multiple>
-          <strong>Drop clips here</strong><span>or click to choose · MP4 / MOV, copied into the job</span>
-        </label>
-        <ul id="clipList" class="files"></ul>
-      </div>
-      <div data-mode="clips-folder" hidden>
-        <div class="path">
-          <input id="clips_folder" name="clips_folder" placeholder="/Users/you/Footage/flight-01" autocomplete="off">
-          <button type="button" class="ghost" data-pick="folder" data-target="clips_folder">Choose…</button>
+        <div data-style="realestate" hidden>
+          <div class="seg" role="radiogroup" aria-label="Footage of the property">
+            <label><input type="radio" name="footage" value="mixed" checked><span>Interior &amp; exterior</span></label>
+            <label><input type="radio" name="footage" value="exterior"><span>Exterior only</span></label>
+          </div>
+          <p class="hint" id="footageHint"></p>
+          <label class="check"><input type="checkbox" id="labels" checked><span>Name each room on its first shot</span></label>
         </div>
-        <p class="hint">Clips are read in place, nothing is copied.</p>
-      </div>
-    </section>
+      </section>
 
-    <section class="group">
-      <h2>Music</h2>
-      <div class="seg" role="radiogroup" aria-label="How to add music">
-        <label><input type="radio" name="music_mode" value="upload" checked><span>Upload a track</span></label>
-        <label><input type="radio" name="music_mode" value="path"><span>Use a file</span></label>
-      </div>
-      <div data-mode="music-upload">
-        <label class="drop small" id="musicDrop">
-          <input type="file" id="musicFile" accept="audio/*,.mp3,.wav,.m4a,.aac,.flac">
-          <strong>Drop the track here</strong><span id="musicHint">MP3, WAV, M4A · you need the rights to use it</span>
-        </label>
-        <ul id="musicList" class="files"></ul>
-      </div>
-      <div data-mode="music-path" hidden>
-        <div class="path">
-          <input id="music_path" name="music_path" placeholder="/Users/you/Music/track.mp3" autocomplete="off">
-          <button type="button" class="ghost" data-pick="music" data-target="music_path">Choose…</button>
+      <section class="group">
+        <h2>Footage</h2>
+        <div class="seg" role="radiogroup" aria-label="How to add clips">
+          <label><input type="radio" name="clips_mode" value="upload" checked><span>Upload clips</span></label>
+          <label><input type="radio" name="clips_mode" value="folder"><span>Use a folder</span></label>
         </div>
-      </div>
-    </section>
-
-    <section class="group">
-      <h2>Film</h2>
-      <div class="row">
-        <label class="field"><span>Maximum length</span>
-          <div class="unit"><input id="max_value" type="number" min="10" step="1" value="45" inputmode="decimal">
-            <select id="max_unit" aria-label="Unit"><option value="1">seconds</option><option value="60">minutes</option></select></div>
-        </label>
-        <label class="field"><span>Quality</span>
-          <select id="quality"><option value="best">Best (slower)</option><option value="fast">Fast (GPU)</option></select>
-        </label>
-      </div>
-      <p class="hint">A ceiling, not a target: the edit ends early rather than repeat shots.</p>
-      <label class="field"><span>Colour</span>
-        <select id="colour"><option value="auto">Detect per clip (drone log, phone, HDR)</option>
-          <option value="dlogm">All clips are DJI D-Log M</option><option value="rec709">All clips are standard colour</option>
-          <option value="graded">Already graded: keep colour as is</option></select>
-      </label>
-      <fieldset class="versions">
-        <legend>Versions</legend>
-        <label class="check"><input type="checkbox" name="versions" value="4k" checked><span>16:9 · 4K</span></label>
-        <label class="check"><input type="checkbox" name="versions" value="1080p"><span>16:9 · 1080p</span></label>
-        <label class="check"><input type="checkbox" name="versions" value="vertical"><span>9:16 short · 1080×1920</span></label>
-      </fieldset>
-      <label class="field" id="vmaxField" hidden><span>Short: maximum length (seconds)</span>
-        <input id="vertical_max_seconds" type="number" min="10" max="90" step="1" value="30"></label>
-      <label class="field"><span>Editor</span>
-        <select id="editor"><option value="claude">Claude picks the shots (reads your notes)</option>
-          <option value="auto">Automatic (rules only, no notes)</option></select>
-      </label>
-    </section>
-
-    <section class="group">
-      <h2 id="cardsHeading">Cards</h2>
-      <label class="field"><span id="titleLabel">Title</span><input id="title" required placeholder="Hollywood Beach" maxlength="80"></label>
-      <label class="field"><span id="subLabel">Line above the title</span><input id="sub" placeholder="Florida · Oct 2026" maxlength="80"></label>
-      <div class="row" data-style="drone">
-        <label class="field"><span>End card name</span><input id="end" placeholder="Your name" maxlength="80"></label>
-        <label class="field"><span>End card line</span><input id="end_sub" value="Shot on DJI Mini 4 Pro" maxlength="80"></label>
-      </div>
-      <div data-style="realestate" hidden>
-        <div class="row three">
-          <label class="field"><span>Price</span><input id="l_price" placeholder="$1,250,000" maxlength="30"></label>
-          <label class="field"><span>Beds</span><input id="l_beds" placeholder="4" maxlength="6" inputmode="decimal"></label>
-          <label class="field"><span>Baths</span><input id="l_baths" placeholder="3" maxlength="6" inputmode="decimal"></label>
+        <div data-mode="clips-upload">
+          <label class="drop" id="clipDrop">
+            <input type="file" id="clipFiles" accept="video/*,.mp4,.mov,.m4v,.mxf" multiple>
+            <strong>Drop clips here</strong><span>or click to choose. MP4 or MOV, copied into the job.</span>
+          </label>
+          <ul id="clipList" class="files"></ul>
         </div>
-        <label class="field"><span>Living area</span>
-          <div class="unit"><input id="l_area" placeholder="2850" maxlength="12" inputmode="decimal">
-            <select id="l_area_unit" aria-label="Area unit"><option value="sq ft">sq ft</option><option value="m²">m²</option></select></div>
-        </label>
+        <div data-mode="clips-folder" hidden>
+          <div class="path">
+            <input id="clips_folder" name="clips_folder" placeholder="/Users/you/Footage/flight-01" autocomplete="off" aria-label="Clips folder">
+            <button type="button" class="ghost" data-pick="folder" data-target="clips_folder">Choose…</button>
+          </div>
+          <p class="hint">Clips are read where they are; nothing is copied.</p>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2>Music</h2>
+        <div class="seg" role="radiogroup" aria-label="How to add music">
+          <label><input type="radio" name="music_mode" value="upload" checked><span>Upload a track</span></label>
+          <label><input type="radio" name="music_mode" value="path"><span>Use a file</span></label>
+        </div>
+        <div data-mode="music-upload">
+          <label class="drop small" id="musicDrop">
+            <input type="file" id="musicFile" accept="audio/*,.mp3,.wav,.m4a,.aac,.flac">
+            <strong>Drop the track here</strong><span id="musicHint">MP3, WAV or M4A that you have the rights to use</span>
+          </label>
+          <ul id="musicList" class="files"></ul>
+        </div>
+        <div data-mode="music-path" hidden>
+          <div class="path">
+            <input id="music_path" name="music_path" placeholder="/Users/you/Music/track.mp3" autocomplete="off" aria-label="Music file">
+            <button type="button" class="ghost" data-pick="music" data-target="music_path">Choose…</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="group">
+        <h2>Film</h2>
         <div class="row">
-          <label class="field"><span>Agent name</span><input id="agent" placeholder="Jane Doe" maxlength="80"></label>
-          <label class="field"><span>Brokerage</span><input id="l_brokerage" placeholder="Coastal Realty" maxlength="60"></label>
+          <label class="field"><span>Maximum length</span>
+            <div class="unit"><input id="max_value" type="number" min="10" step="1" value="45" inputmode="decimal">
+              <select id="max_unit" aria-label="Unit"><option value="1">seconds</option><option value="60">minutes</option></select></div>
+          </label>
+          <label class="field"><span>Quality</span>
+            <select id="quality"><option value="best">Best (slower)</option><option value="fast">Fast (GPU)</option></select>
+          </label>
         </div>
-        <div class="row three even">
-          <label class="field"><span>Phone</span><input id="l_phone" type="tel" placeholder="(954) 555-0100" maxlength="30"></label>
-          <label class="field"><span>Email</span><input id="l_email" type="email" placeholder="jane@coastal.com" maxlength="80"></label>
-          <label class="field"><span>Website</span><input id="l_website" placeholder="coastal.com" maxlength="80"></label>
-        </div>
-        <label class="drop small" id="logoDrop">
-          <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp">
-          <strong>Logo (optional)</strong><span>PNG with transparency works best · JPG, WebP · shown under the details</span>
+        <p class="hint">A ceiling, not a target: the edit ends early rather than repeat shots.</p>
+        <label class="field"><span>Colour</span>
+          <select id="colour"><option value="auto">Detect per clip (drone log, phone, HDR)</option>
+            <option value="dlogm">All clips are DJI D-Log M</option><option value="rec709">All clips are standard colour</option>
+            <option value="graded">Already graded: keep colour as is</option></select>
         </label>
-        <ul id="logoList" class="files"></ul>
-        <p class="hint">Empty fields are left off the end card. The address opens the film; the details close it.</p>
-      </div>
-    </section>
+        <fieldset class="versions">
+          <legend>Versions</legend>
+          <label class="check"><input type="checkbox" name="versions" value="4k" checked><span>Landscape 4K</span></label>
+          <label class="check"><input type="checkbox" name="versions" value="1080p"><span>Landscape 1080p</span></label>
+          <label class="check"><input type="checkbox" name="versions" value="vertical"><span>Vertical short <small>1080×1920</small></span></label>
+        </fieldset>
+        <label class="field" id="vmaxField" hidden><span>Short: maximum length (seconds)</span>
+          <input id="vertical_max_seconds" type="number" min="10" max="90" step="1" value="30"></label>
+        <label class="field"><span>Editor</span>
+          <select id="editor"><option value="claude">Claude picks the shots (reads your notes)</option>
+            <option value="auto">Automatic (rules only, no notes)</option></select>
+        </label>
+      </section>
 
-    <section class="group">
-      <h2>Notes for the editor</h2>
-      <textarea id="notes" rows="5" placeholder=""></textarea>
-    </section>
+      <section class="group">
+        <h2 id="cardsHeading">Cards</h2>
+        <label class="field"><span id="titleLabel">Title</span><input id="title" required placeholder="Hollywood Beach" maxlength="80"></label>
+        <label class="field"><span id="subLabel">Line above the title</span><input id="sub" placeholder="Florida · Oct 2026" maxlength="80"></label>
+        <div class="row" data-style="drone">
+          <label class="field"><span>End card name</span><input id="end" placeholder="Your name" maxlength="80"></label>
+          <label class="field"><span>End card line</span><input id="end_sub" value="Shot on DJI Mini 4 Pro" maxlength="80"></label>
+        </div>
+        <div data-style="realestate" hidden>
+          <div class="row three">
+            <label class="field"><span>Price</span><input id="l_price" placeholder="$1,250,000" maxlength="30"></label>
+            <label class="field"><span>Beds</span><input id="l_beds" placeholder="4" maxlength="6" inputmode="decimal"></label>
+            <label class="field"><span>Baths</span><input id="l_baths" placeholder="3" maxlength="6" inputmode="decimal"></label>
+          </div>
+          <label class="field"><span>Living area</span>
+            <div class="unit"><input id="l_area" placeholder="2850" maxlength="12" inputmode="decimal">
+              <select id="l_area_unit" aria-label="Area unit"><option value="sq ft">sq ft</option><option value="m²">m²</option></select></div>
+          </label>
+          <div class="row">
+            <label class="field"><span>Agent name</span><input id="agent" placeholder="Jane Doe" maxlength="80"></label>
+            <label class="field"><span>Brokerage</span><input id="l_brokerage" placeholder="Coastal Realty" maxlength="60"></label>
+          </div>
+          <div class="row three even">
+            <label class="field"><span>Phone</span><input id="l_phone" type="tel" placeholder="(954) 555-0100" maxlength="30"></label>
+            <label class="field"><span>Email</span><input id="l_email" type="email" placeholder="jane@coastal.com" maxlength="80"></label>
+            <label class="field"><span>Website</span><input id="l_website" placeholder="coastal.com" maxlength="80"></label>
+          </div>
+          <label class="drop small" id="logoDrop">
+            <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp">
+            <strong>Add a logo</strong><span>Optional. PNG with transparency works best; JPG and WebP also work.</span>
+          </label>
+          <ul id="logoList" class="files"></ul>
+          <p class="hint">Empty fields are left off the end card. The address opens the film; the details close it.</p>
+        </div>
+      </section>
 
-    <section class="group">
-      <h2>Output</h2>
-      <div class="path">
-        <input id="output_dir" placeholder="~/Movies/Drone Studio" autocomplete="off">
-        <button type="button" class="ghost" data-pick="output" data-target="output_dir">Choose…</button>
-      </div>
-    </section>
+      <section class="group">
+        <h2><label for="notes">Notes for the editor</label></h2>
+        <textarea id="notes" rows="5" placeholder=""></textarea>
+      </section>
 
-    <p id="formError" class="error" role="alert" hidden></p>
-    <button id="create" class="primary" type="submit">Create video</button>
+      <section class="group">
+        <h2>Save to</h2>
+        <div class="path">
+          <input id="output_dir" placeholder="~/Movies/Drone Studio" autocomplete="off" aria-label="Output folder">
+          <button type="button" class="ghost" data-pick="output" data-target="output_dir">Choose…</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="plan-foot">
+      <p id="formError" class="error" role="alert" hidden></p>
+      <button id="create" class="primary" type="submit">Create video</button>
+    </div>
   </form>
 
-  <section class="panel run" aria-live="polite">
+  <section class="film" aria-live="polite" aria-label="The film">
     <div id="empty" class="empty">
-      <h2>Your film appears here</h2>
-      <p>Add clips and a track, set the title and the length, then press <strong>Create video</strong>.
-        Footage analysis and the edit take a few minutes; a 4K render about 8 more.</p>
+      <div class="viewfinder" aria-hidden="true"><i></i><i></i><i></i><i></i><span class="horizon"></span></div>
+      <h2>Your film plays here</h2>
+      <p>Fill in the plan, then press <strong>Create video</strong>. Analysis and the edit take a few minutes;
+        a 4K render takes about 8 more.</p>
     </div>
     <div id="job" hidden>
       <div class="jobhead">
-        <div><h2 id="jobTitle"></h2><p id="jobState" class="state"></p></div>
+        <div><h1 id="jobTitle"></h1><p id="jobState" class="state"></p></div>
         <button id="cancel" type="button" class="ghost danger" hidden>Cancel</button>
       </div>
-      <ol id="stages" class="stages"></ol>
+      <ol id="stages" class="route" aria-label="Progress"></ol>
       <p id="activity" class="activity" hidden></p>
       <p id="jobError" class="error" hidden></p>
+      <figure id="strip" class="strip" hidden><img alt="A frame from the middle of every clip"><figcaption>Your clips</figcaption></figure>
       <div id="outputs" class="outputs"></div>
       <div id="summary" class="summary" hidden></div>
-      <details id="cutBox" hidden><summary>The cut</summary><table class="cut"><thead><tr><th>At</th><th>Clip</th><th>From</th><th>Length</th><th>Speed</th><th>Join</th><th>Why</th></tr></thead><tbody id="cutRows"></tbody></table></details>
+      <section id="sheet" class="sheet" hidden aria-label="The cut, shot by shot"></section>
+      <details id="cutBox" hidden><summary>Shot details: in points, speed, joins and why</summary><div class="cut-wrap"><table class="cut"><thead><tr><th>Shot</th><th>At</th><th>Clip</th><th>From</th><th>Length</th><th>Speed</th><th>Join</th><th>Why</th></tr></thead><tbody id="cutRows"></tbody></table></div></details>
       <form id="revise" class="revise" hidden>
         <label class="field"><span>Edit again with notes</span>
-          <textarea id="reviseNotes" rows="3" placeholder="E.g. more slow motion, drop the top-down shot, end on the skyline."></textarea></label>
+          <textarea id="reviseNotes" rows="3" placeholder="Refer to shots by their number on the sheet. E.g. replace shot 3 with clip 0045, make shot 7 shorter, end on the view from shot 2."></textarea></label>
         <button class="primary" type="submit">Edit again</button>
       </form>
       <details><summary>Log</summary><pre id="log" class="log"></pre></details>
     </div>
     <div class="history">
-      <h3>Recent</h3>
+      <h2>Earlier films</h2>
       <ul id="history"></ul>
     </div>
   </section>

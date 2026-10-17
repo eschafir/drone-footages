@@ -62,6 +62,12 @@ def listing_card(s):
     return s["title"], s["sub"], lines
 
 
+def full_path(p):
+    """A path from the form, absolute: every step runs inside the job folder, where a relative path means nothing."""
+    p = os.path.expanduser(str(p or "").strip())
+    return os.path.abspath(p) if p else ""
+
+
 def validate(s):
     """Settings from the form -> cleaned settings, or ValueError with a message for the page."""
     def num(key, lo, hi, default):
@@ -89,9 +95,9 @@ def validate(s):
         "quality": "fast" if s.get("quality") == "fast" else "best",
         "editor": "auto" if s.get("editor") == "auto" else "claude",
         "clips_mode": "folder" if s.get("clips_mode") == "folder" else "upload",
-        "clips_folder": os.path.expanduser(str(s.get("clips_folder", "")).strip()),
+        "clips_folder": full_path(s.get("clips_folder")),
         "music_mode": "path" if s.get("music_mode") == "path" else "upload",
-        "music_path": os.path.expanduser(str(s.get("music_path", "")).strip()),
+        "music_path": full_path(s.get("music_path")),
         "output_dir": os.path.expanduser(str(s.get("output_dir", "")).strip() or "~/Movies/Drone Studio"),
     }
     if not out["versions"]:
@@ -193,7 +199,58 @@ class Job:
                             "vertical": {"duration": C["vertical"].get("duration"), "shots": len(C["vertical"].get("shots", []))} if C.get("vertical") else None}
             except (OSError, ValueError):
                 pass
+        idx = os.path.join(self.dir, "sheets", "shots", "index.json")
+        if os.path.exists(idx):
+            try:
+                with open(idx) as f:
+                    d["sheet"] = json.load(f)
+            except (OSError, ValueError):
+                pass
         return d
+
+    def shot_frames(self):
+        """The sheet the page shows after the edit: one frame per shot in film order (numbered 1..n, as notes refer to
+        them), the same for the vertical short, and one frame of each clip the film leaves out. Frames come from the
+        graded proxies, at the middle of what each shot really uses. -> sheets/shots/*.jpg + index.json"""
+        with open(os.path.join(self.dir, "cutlist.json")) as f:
+            C = json.load(f)
+        with open(os.path.join(self.dir, "clips.json")) as f:
+            clips = {c["id"]: c for c in json.load(f)["clips"]}
+        out = os.path.join(self.dir, "sheets", "shots")
+        shutil.rmtree(out, True)
+        os.makedirs(out)
+
+        def grab(clip, t, name, window=None):
+            c = clips[clip]
+            vf = "scale=480:-2"
+            if window is not None:                                    # the 9:16 window the short shows
+                x, y, w, h = c.get("proxy_box") or [0, 0, 960, 540]
+                if c.get("orientation") == "portrait":
+                    vf = "crop=%d:%d:%d:%d,scale=270:-2" % (w, h, x, y)
+                else:
+                    cw = int(h * 9 / 16) // 2 * 2
+                    vf = "crop=%d:%d:%d:%d,scale=270:-2" % (cw, h, x + int((w - cw) * window), y)
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", "%.3f" % max(0.0, t), "-i", os.path.join(self.dir, c["proxy"]),
+                            "-frames:v", "1", "-vf", vf, "-q:v", "4", os.path.join(out, name)], check=True)
+            return "sheets/shots/" + name
+
+        def shots(seq, prefix, vertical):
+            rows = []
+            for n, s in enumerate(seq, 1):
+                mid = float(s["in"]) + float(s["dur"]) * float(s.get("speed", 1.0)) / 2
+                window = None
+                if vertical:
+                    window = sum(s["pan"]) / 2 if s.get("pan") else float(s.get("x", 0.5))
+                rows.append({"n": n, "clip": s["clip"], "at": s.get("at"), "dur": s["dur"], "speed": s.get("speed", 1.0),
+                             "label": s.get("label"), "img": grab(s["clip"], mid, "%s-%02d.jpg" % (prefix, n), window)})
+            return rows
+        sheet = {"version": int(time.time()), "film": shots(C["shots"], "film", False),
+                 "short": shots(C["vertical"]["shots"], "short", True) if C.get("vertical") else []}
+        used = {s["clip"] for s in C["shots"]} | {s["clip"] for s in (C.get("vertical") or {}).get("shots", [])}
+        sheet["unused"] = [{"clip": cid, "img": grab(cid, c["duration"] / 2, "clip-%s.jpg" % cid)} for cid, c in clips.items() if cid not in used]
+        with open(os.path.join(out, "index.json"), "w") as f:
+            json.dump(sheet, f, indent=1)
+        return sheet
 
     # ---- paths
     @property
@@ -302,8 +359,12 @@ class Job:
             self.update(editor_used=used, summary=summary)
             with open(os.path.join(self.dir, "cutlist.json")) as f:
                 C = json.load(f)
+            try:
+                self.shot_frames()
+            except (subprocess.CalledProcessError, OSError, KeyError, ValueError) as e:   # the sheet is a convenience
+                self.log("shot sheet: %s" % e)
             self.stage("edit", state="done", progress=1.0,
-                       detail="%s · %d shots · %.0f s" % ("Claude" if used == "claude" else "automatic", len(C["shots"]), C["duration"]))
+                       detail="%s, %d shots, %.0f s" % ("Claude" if used == "claude" else "automatic", len(C["shots"]), C["duration"]))
 
             outputs = []
             for v in s["versions"]:

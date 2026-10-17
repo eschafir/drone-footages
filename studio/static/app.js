@@ -8,10 +8,10 @@ const STORE = "drone-studio-form";
 // what changes with the style; a field still holding the other style's default takes this one's
 const STYLE = {
   drone: { max: 45, heading: "Cards", title: ["Title", "Hollywood Beach"], sub: ["Line above the title", "Florida · Oct 2026"],
-    music: "MP3, WAV, M4A · you need the rights to use it",
+    music: "MP3, WAV or M4A that you have the rights to use",
     notes: "Mood, pace, must-have shots, things to avoid. E.g. calm and warm, open on the open sea, slow motion on the wave, no top-down shots." },
   realestate: { max: 60, heading: "Listing", title: ["Address", "1420 N Ocean Drive"], sub: ["City / neighbourhood", "Hollywood, FL"],
-    music: "Calm, 80–110 BPM · a licence that allows commercial use",
+    music: "Calm, 80–110 BPM, with a licence that allows commercial use",
     notes: "What sells this house, the mood, must-have shots, things to avoid. E.g. bright and airy, open on the ocean view, show the renovated kitchen, skip the garage." },
 };
 const FOOTAGE_HINT = {
@@ -167,18 +167,71 @@ function showJob(id, title, state) {
   $("jobTitle").textContent = title || "";
   $("jobState").textContent = state || "";
   $("stages").innerHTML = ""; $("outputs").innerHTML = ""; $("summary").hidden = true; $("cutBox").hidden = true;
-  $("revise").hidden = true; $("jobError").hidden = true; $("activity").hidden = true;
+  $("revise").hidden = true; $("jobError").hidden = true; $("activity").hidden = true; $("strip").hidden = true;
+  $("strip").dataset.src = ""; $("sheet").hidden = true; $("sheet").dataset.key = "";
 }
+// the cut as a numbered sheet, in film order: notes refer to "shot 4", "short shot 2", or a clip id like 0045
+function clock(t) { t = Math.max(0, Math.round(+t || 0)); return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0"); }
+function tile(j, sh, s, kind) {
+  const facts = [s.at != null ? `<span>${clock(s.at)}</span>` : "", `<span>${(+s.dur).toFixed(1)}\u00a0s</span>`,
+    `<span>clip ${esc(s.clip)}</span>`, s.speed < 1 ? `<span>slow motion</span>` : ""].join("");
+  return `<li><button type="button" class="shot" data-seek="${kind}" data-at="${+s.at || 0}"
+      aria-label="${kind === "film" ? "Shot" : "Short shot"} ${s.n}, clip ${esc(s.clip)}, at ${clock(s.at)}. Play from here.">
+    <img src="/media/${j.id}/${esc(s.img)}?v=${sh.version}" alt="" loading="lazy">
+    <span class="n">${s.n}</span>
+    <span class="facts">${facts}</span>${s.label ? `<span class="room">${esc(s.label)}</span>` : ""}</button></li>`;
+}
+function renderSheet(j) {
+  const sh = j.sheet, key = sh ? j.id + sh.version : "";
+  if ($("sheet").dataset.key === key) return;
+  $("sheet").dataset.key = key;
+  if (!sh) { $("sheet").hidden = true; return; }
+  const group = (title, note, cls, items) => items.length ? `<div class="sheet-group ${cls}"><h2>${title}</h2>${note ? `<p class="hint">${note}</p>` : ""}
+    <ol class="tiles-grid">${items.join("")}</ol></div>` : "";
+  $("sheet").innerHTML =
+    group("The film, shot by shot", "In the order they play. Click a shot to play the film from there; use its number in your notes.", "",
+      sh.film.map((s) => tile(j, sh, s, "film"))) +
+    group("Vertical short", "", "short", sh.short.map((s) => tile(j, sh, s, "short"))) +
+    group("Not used", "Clips left out of this cut. Name one by its clip number to bring it in.", "unused",
+      sh.unused.map((u) => `<li><figure class="shot"><img src="/media/${j.id}/${esc(u.img)}?v=${sh.version}" alt="" loading="lazy">
+        <figcaption class="facts"><span>clip ${esc(u.clip)}</span></figcaption></figure></li>`));
+  $("sheet").hidden = false;
+}
+const SHORT = { ingest: "Prepare", analyze: "Analyze", music: "Music", edit: "Edit", "render-4k": "Render 4K",
+  "render-1080p": "Render 1080p", "render-vertical": "Render short", deliver: "Deliver" };
+function waypointDetail(s) {          // short enough to sit under a waypoint; the full text is in the tooltip
+  const raw = s.detail || "", d = raw.replace(/(\d) (s|BPM|shots|clips|usable)\b/g, "$1\u00a0$2");
+  if (s.key === "music") { const m = raw.match(/^([\d.]+) BPM/); return m ? Math.round(+m[1]) + "\u00a0BPM" : d; }
+  if (s.key === "deliver" && s.state === "done") return "Saved";
+  if (s.key === "edit") return d.replace(/ · /g, ", ");
+  return d;
+}
+const VERSION_NAME = { "4k": "Landscape 4K", "1080p": "Landscape 1080p", vertical: "Vertical short" };
 const STATE_TEXT = { draft: "Waiting for files", queued: "Queued", running: "Working", done: "Done", failed: "Stopped with an error", cancelled: "Cancelled" };
 function renderJob(j) {
   $("jobTitle").textContent = j.settings.title;
-  const used = j.editor_used ? ` · edited by ${j.editor_used === "claude" ? "Claude" : "the automatic planner"}` : "";
+  const used = j.editor_used ? `, edited by ${j.editor_used === "claude" ? "Claude" : "the automatic planner"}` : "";
   $("jobState").textContent = (STATE_TEXT[j.state] || j.state) + used;
-  $("stages").innerHTML = j.stages.map((s) => `<li class="${s.state}"><span class="dot" aria-hidden="true"></span>
-    <span class="label">${esc(s.label)}</span><span class="detail">${esc(s.detail || "")}</span>
+  // the flight path: one waypoint per stage
+  $("stages").innerHTML = j.stages.map((s) => `<li class="${esc(s.state)}"${s.state === "running" ? ' aria-current="step"' : ""}>
+    <span class="leg" aria-hidden="true"></span><span class="wp" aria-hidden="true"></span>
+    <span class="label">${esc(SHORT[s.key] || s.label)}</span><span class="detail" title="${esc(s.detail || "")}">${esc(waypointDetail(s))}</span>
     ${s.state === "running" && s.progress ? `<span class="bar"><i style="width:${(100 * s.progress).toFixed(0)}%"></i></span>` : ""}</li>`).join("");
-  $("activity").hidden = !(j.activity && j.state === "running");
+  // the footage, once analysed: a frame from the middle of every clip
+  const analysed = j.stages.some((s) => s.key === "analyze" && s.state === "done");
+  const src = analysed ? `/media/${j.id}/sheets/overview.png` : "";
+  renderSheet(j);
+  if (j.sheet) { $("strip").hidden = true; $("strip").dataset.src = "sheet"; }
+  else if ($("strip").dataset.src !== src) {
+    $("strip").dataset.src = src;
+    if (src) { const img = $("strip").querySelector("img"); img.onload = () => { $("strip").hidden = false; }; img.onerror = () => { $("strip").hidden = true; }; img.src = src; }
+    else $("strip").hidden = true;
+  }
+  // what the editor is doing, only while it edits
+  const editing = j.state === "running" && j.stages.some((s) => s.key === "edit" && s.state === "running");
+  $("activity").hidden = !(j.activity && editing);
   $("activity").textContent = j.activity || "";
+  $("activity").classList.toggle("claude", j.settings.editor === "claude" && !/^Automatic/.test(j.activity || ""));
   $("jobError").hidden = !j.error; $("jobError").textContent = j.error || "";
   $("cancel").hidden = !["queued", "running"].includes(j.state);
   $("summary").hidden = !(j.summary && j.state === "done"); $("summary").textContent = j.summary || "";
@@ -186,8 +239,8 @@ function renderJob(j) {
   if ($("outputs").dataset.key !== outKey) {
     $("outputs").dataset.key = outKey;
     $("outputs").innerHTML = j.outputs.map((o) => `<div class="out">
-      <video controls preload="metadata" src="/media/${j.id}/${o.file}?v=${o.size}"></video>
-      <div class="meta"><strong>${esc(o.label)}</strong>
+      <video controls preload="metadata" data-version="${esc(o.version)}" src="/media/${j.id}/${o.file}?v=${o.size}#t=1"></video>
+      <div class="meta"><strong>${esc(VERSION_NAME[o.version] || o.label)}</strong>
         <span class="badge ${o.verify_pass ? "ok" : "bad"}" title="${esc(o.verify.map((r) => r.join(": ")).join("\n"))}">${o.verify_pass ? "verified" : "check failed"}</span>
         <span>${mb(o.size)}</span>
         ${o.delivered ? `<button type="button" class="ghost" data-reveal="${esc(o.delivered)}">Show in Finder</button>` : ""}
@@ -195,7 +248,7 @@ function renderJob(j) {
   }
   if (j.cut && j.cut.shots) {
     $("cutBox").hidden = false;
-    $("cutRows").innerHTML = j.cut.shots.map((s) => `<tr><td>${s.at.toFixed(1)} s</td><td>${esc(s.clip)}</td><td>${s.in.toFixed(1)} s</td>
+    $("cutRows").innerHTML = j.cut.shots.map((s, i) => `<tr><td><strong>${i + 1}</strong></td><td>${s.at.toFixed(1)} s</td><td>${esc(s.clip)}</td><td>${s.in.toFixed(1)} s</td>
       <td>${s.dur.toFixed(1)} s</td><td>${s.speed === 1 ? "" : s.speed + "×"}</td><td>${esc(s.transition.type)}</td><td>${esc(s.note || "")}</td></tr>`).join("");
   }
   $("revise").hidden = !["done", "failed"].includes(j.state) || !j.stages.some((s) => s.key === "edit");
@@ -214,21 +267,25 @@ async function poll() {
     if (live) timer = setTimeout(poll, 1000); else loadHistory();
   } catch (e) { timer = setTimeout(poll, 3000); }
 }
+function when(iso) {
+  const d = new Date(iso);
+  return isNaN(d) ? iso : d.toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
 async function loadHistory() {
   const list = await api("GET", "/api/jobs").catch(() => []);
   $("history").innerHTML = list.map((j) => `<li><button type="button" data-job="${esc(j.id)}" data-title="${esc(j.title)}">
-    <span>${esc(j.title)}</span><span class="when">${esc(STATE_TEXT[j.state] || j.state)} · ${esc(j.created.replace("T", " ").slice(0, 16))}</span></button></li>`).join("")
+    <span>${esc(j.title)}</span><span class="when">${esc(STATE_TEXT[j.state] || j.state)}, ${esc(when(j.created))}</span></button></li>`).join("")
     || `<li class="when">No films yet.</li>`;
 }
 async function checks() {
   const c = await api("GET", "/api/check").catch(() => null);
   if (!c) return;
-  const chip = (cls, text) => `<span class="chip ${cls}">${esc(text)}</span>`;
-  $("checks").innerHTML = [
-    chip(c.ffmpeg ? "ok" : "bad", "ffmpeg"), chip(c.numpy ? "ok" : "bad", "numpy"), chip(c.chrome ? "ok" : "bad", "Chrome"),
-    chip(c.claude ? "ok" : "warn", c.claude ? "Claude" : "Claude CLI missing: automatic edits only"),
-    chip(c.lut ? "ok" : "warn", c.lut ? "LUT" : "no LUT: approximate colour"),
-  ].join("");
+  // one line: ready, or what is missing and what that means
+  const missing = [!c.ffmpeg && "ffmpeg", !c.numpy && "numpy", !c.chrome && "Google Chrome"].filter(Boolean);
+  const notes = [!c.claude && "Claude CLI not found, so edits are automatic", !c.lut && "No DJI LUT, so D-Log colour is approximate"].filter(Boolean);
+  $("checks").innerHTML = missing.length ? `<span class="bad">Install ${esc(missing.join(", "))} to create films</span>`
+    : notes.length ? `<span class="warn">${esc(notes.join(". "))}</span>`
+    : `<span class="ok" title="ffmpeg, numpy, Chrome, Claude and the DJI LUT are all in place">Ready</span>`;
   if (!$("output_dir").value) $("output_dir").placeholder = c.default_output;
   if (!c.picker) document.querySelectorAll("[data-pick]").forEach((b) => { b.hidden = true; });
   if (!c.claude) $("editor").value = "auto";
@@ -249,6 +306,10 @@ document.addEventListener("click", async (ev) => {
     try { const r = await api("POST", "/api/pick", { kind: t.dataset.pick }); if (r.path) { $(t.dataset.target).value = r.path; remember(); } }
     finally { t.disabled = false; }
   } else if (t.dataset.job) { showJob(t.dataset.job, t.dataset.title, "Loading…"); poll(); }
+  else if (t.dataset.seek) {             // a shot on the sheet: play its version of the film from there
+    const v = document.querySelector(t.dataset.seek === "short" ? 'video[data-version="vertical"]' : 'video[data-version="4k"], video[data-version="1080p"]');
+    if (v) { v.currentTime = +t.dataset.at + 0.05; v.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" }); v.play().catch(() => {}); }
+  }
   else if (t.dataset.reveal) { api("POST", "/api/reveal", { id: current, path: t.dataset.reveal }).catch(() => {}); }
 });
 $("cancel").addEventListener("click", () => current && api("POST", `/api/jobs/${current}/cancel`).then(poll));
