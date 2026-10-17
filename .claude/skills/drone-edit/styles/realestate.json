@@ -1,0 +1,10 @@
+{
+  "label": "Real estate",
+  "analyze": {"jerk_ref": 0.5, "head": 0.6, "tail": 0.5},
+  "cut": {"head": 0.5, "tail": 0.4, "min_shot": 2.5, "max_slowmo_shots": 2,
+          "transitions": ["cut", "fade", "fadeblack", "dissolve"]},
+  "plan": {"pace_quiet": 5.0, "pace_loud": 3.6, "vpace_quiet": 4.2, "vpace_loud": 3.2, "min_bars": 1, "drop_whip": false, "fade": 0.8, "order": "file"},
+  "look": {"contrast": 0.2, "saturation": 0.0, "vibrance": 0.08, "warmth": 0.1, "vignette": 0.0},
+  "cards": {"end_sub": "", "end_dur": 5.5, "title_dur": 4.5},
+  "default_max": 60
+}

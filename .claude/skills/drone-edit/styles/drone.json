@@ -1,0 +1,10 @@
+{
+  "label": "Drone film",
+  "analyze": {"jerk_ref": 0.35, "head": 1.0, "tail": 0.7},
+  "cut": {"head": 0.9, "tail": 0.6, "min_shot": 0, "max_slowmo_shots": null,
+          "transitions": ["cut", "fade", "fadeblack", "fadewhite", "zoomin", "smoothleft", "smoothright", "smoothup", "smoothdown", "dissolve"]},
+  "plan": {"pace_quiet": 4.2, "pace_loud": 2.4, "vpace_quiet": 3.2, "vpace_loud": 2.0, "min_bars": 0, "drop_whip": true, "fade": 0.6, "order": "score"},
+  "look": {"contrast": 0.35, "saturation": 0.05, "vibrance": 0.15, "warmth": 0.0, "vignette": 0.25},
+  "cards": {"end_sub": "Shot on DJI Mini 4 Pro", "end_dur": 3.5, "title_dur": 4.0},
+  "default_max": 45
+}

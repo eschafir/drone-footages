@@ -1,0 +1,64 @@
+# Video
+*.mp4
+*.MP4
+*.mov
+*.MOV
+*.m4v
+*.avi
+*.mkv
+*.webm
+*.mts
+*.MTS
+*.m2ts
+*.mxf
+*.lrf
+*.LRF
+*.insv
+*.360
+
+# Audio
+*.wav
+*.WAV
+*.mp3
+*.MP3
+*.m4a
+*.aac
+*.flac
+*.ogg
+*.opus
+*.aif
+*.aiff
+*.wma
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Node
+node_modules/
+
+# Environment / secrets
+.env
+.env.*
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Miscellaneous
+/WeAreNoCode-YouTube-Editor
+/studio-jobs
+/videos
+/raw
