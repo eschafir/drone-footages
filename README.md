@@ -11,6 +11,9 @@ film with music. It has two parts:
 
 Two styles are supported: a drone travel film, and a real-estate property tour with room labels and a listing end card.
 
+To finish an edit by hand, either part can also export it as a **CapCut project** on the ungraded source clips (see
+`studio/README.md`).
+
 ## Requirements
 
 - macOS (the file and folder pickers use macOS dialogs)
@@ -20,6 +23,7 @@ Two styles are supported: a drone travel film, and a real-estate property tour w
 - Optional: the [Claude Code](https://claude.com/claude-code) CLI (`claude`), to have Claude write the edit from your
   notes. Without it, use the Automatic editor.
 - Optional: the DJI LUT for D-Log M footage, as a `.cube` file in `.claude/skills/drone-edit/assets/luts/`
+- Optional: [CapCut](https://www.capcut.com/) desktop, for the CapCut project export (made against CapCut 9.6)
 
 ## Starting the service
 

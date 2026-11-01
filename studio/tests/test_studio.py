@@ -7,6 +7,7 @@ import http.client, json, os, shutil, stat, subprocess, sys, tempfile, threading
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TMP = tempfile.mkdtemp(prefix="drone-studio-test-")
 os.environ["DRONE_STUDIO_JOBS"] = os.path.join(TMP, "jobs")
+os.environ["CAPCUT_DRAFTS"] = os.path.join(TMP, "capcut-drafts")          # never the real CapCut library
 sys.path.insert(0, os.path.join(ROOT, "studio"))
 sys.path.insert(0, os.path.join(ROOT, ".claude", "skills", "drone-edit", "scripts"))
 import jobs, server  # noqa: E402
@@ -25,6 +26,17 @@ RE_WHIP = {"music_start_bar": 0, "shots": [{"clip": "0010", "in": 1.0, "bars": 2
                                            {"clip": "0020", "in": 1.0, "bars": 2, "transition": ["zoomin", 0.4]}]}
 PNG = bytes.fromhex("89504e470d0a1a0a0000000d4948445200000001000000010806000000""1f15c4890000000d49444154789c6360f8cfc0f01f0005000201"
                     "a1d6d0c70000000049454e44ae426082")
+
+
+def fake_pgrep(running):
+    """A stand-in for pgrep on PATH, so CapCut reads as open or closed whatever the machine runs."""
+    d = os.path.join(TMP, "bin-capcut-%s" % ("open" if running else "closed"))
+    os.makedirs(d, exist_ok=True)
+    path = os.path.join(d, "pgrep")
+    with open(path, "w") as f:
+        f.write("#!/bin/sh\nexit %d\n" % (0 if running else 1))
+    os.chmod(path, os.stat(path).st_mode | stat.S_IEXEC)
+    return d + os.pathsep + os.environ["PATH"]
 
 
 def fake_claude(path, spec):
@@ -299,3 +311,27 @@ class Studio(unittest.TestCase):
         self.assertEqual(j["state"], "done", j.get("error") or j["log"][-3000:])
         self.assertEqual(j["editor_used"], "automatic")
         self.assertIn("did not pass", j["summary"])
+
+    @unittest.skipUnless(HAS_FFMPEG, "ffmpeg missing")
+    def test_capcut_project(self):
+        """CapCut open: the stage warns and the job still finishes; closed (Edit again): the draft is written."""
+        path = os.environ["PATH"]
+        try:
+            os.environ["PATH"] = fake_pgrep(True)
+            j = self.run_job(capcut=True)
+            self.assertEqual(j["state"], "done", j.get("error") or j["log"][-3000:])
+            stage = next(x for x in j["stages"] if x["key"] == "capcut")
+            self.assertEqual(stage["state"], "warn")
+            self.assertIsNone(j["capcut"][0]["draft"])
+            self.assertTrue(os.path.exists(os.path.join(j["capcut"][0]["media"], "CUT-SHEET.md")))
+            os.environ["PATH"] = fake_pgrep(False)
+            self.assertEqual(self.req("POST", "/api/jobs/%s/revise" % j["id"], {"notes": "again"})[0], 200)
+            j = self.wait(j["id"])
+        finally:
+            os.environ["PATH"] = path
+        self.assertEqual(j["state"], "done", j.get("error") or j["log"][-3000:])
+        self.assertEqual(next(x for x in j["stages"] if x["key"] == "capcut")["state"], "done")
+        draft = j["capcut"][0]["draft"]
+        self.assertEqual(draft, os.path.join(TMP, "capcut-drafts", "Test Film"))
+        with open(os.path.join(draft, "draft_info.json")) as f:
+            self.assertEqual(len(json.load(f)["tracks"][0]["segments"]), len(j["cut"]["shots"]))

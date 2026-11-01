@@ -14,6 +14,13 @@ python3 studio/server.py            # opens http://127.0.0.1:8765  (--port, --no
   clip's contact sheet and writes the cut. *Automatic* uses the rule-based planner and ignores the notes. If Claude
   fails or writes a cut that does not pass the checks, the job falls back to Automatic and says so.
 - **Versions:** 16:9 4K, 16:9 1080p, 9:16 short. **Quality:** Best (x264) or Fast (VideoToolbox).
+- **Also a CapCut project:** after the renders, the edit is written into CapCut's project list (16:9, plus 9:16 if
+  the short is on), to finish by hand. Each shot uses the original clip, ungraded, with the rest of the clip as
+  handles. The title and end cards are on an overlay track and the music is on its own track. **Quit CapCut first**:
+  while it runs, the project is not written (the stage warns; quit CapCut and press Edit again). In CapCut, apply the
+  LUT to the D-Log M shots (Adjustment → LUT → import the `.cube` from the media folder). Dissolves arrive as cuts,
+  and the fades to black, card fades and loudness are left to you. `CUT-SHEET.md` in the media folder lists every
+  shot and each of these, and is the fallback if CapCut won't open the project.
 - **Edit again** re-runs only the edit and the renders with your new notes; unchanged shots come from the cache.
 - **The shot sheet:** after the edit, the page shows the cut as numbered frames in film order (and the short's, and
   the clips left out). Click one to play from there. In notes, say "shot 4", "short shot 2", or a clip number like

@@ -13,7 +13,7 @@ Usage:
                    --line "Jane Doe · Coastal Realty" --logo logo.png --out card-end.png
   python3 cards.py --kind label --text "Kitchen" --out card-label.png
 """
-import argparse, base64, html, json, os, shutil, subprocess, sys, tempfile
+import argparse, base64, hashlib, html, json, os, shutil, subprocess, sys, tempfile
 import common
 
 CHROME = ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "google-chrome", "chromium", "chrome"]
@@ -123,6 +123,51 @@ def render_card(kind, text, sub, out, width, height, lines=(), logo=None):
     p = common.probe(out)
     if (p["width"], p["height"]) != (width, height):
         common.die("card %s is %dx%d, wanted %dx%d" % (out, p["width"], p["height"], width, height))
+    return out
+
+
+def cached(work, kind, spec, width, height):
+    """The card PNG for spec (text, sub, lines, logo) in work/, rendered on first use; render.py and capcut.py share it."""
+    if kind == "label":
+        key = spec["text"]
+        name = "card-label-%dx%d-%s.png"
+    else:
+        logo = spec.get("logo")
+        key = json.dumps([spec.get("text"), spec.get("sub"), spec.get("lines"), logo,
+                          os.path.getmtime(logo) if logo and os.path.exists(logo) else 0])
+        name = "card-" + kind + "-%dx%d-%s.png"
+    png = os.path.join(work, name % (width, height, hashlib.sha1(key.encode()).hexdigest()[:8]))
+    if not os.path.exists(png):
+        render_card(kind, spec["text"], spec.get("sub", ""), png, width, height, spec.get("lines") or (), spec.get("logo"))
+    return png
+
+
+def placements(C, seq, vertical, starts, tframes, total, work, width, height):
+    """Where the cards go on the film: [(png, at, dur, fade, kind, text)]. Title and end from the cutlist (the
+    vertical section overrides them for the short); room labels ("label" on a shot, with "labels": true) from 0.4 s
+    after the cut for up to 2.5 s. starts and tframes in frames, from common.frame_timeline."""
+    fps = common.FPS
+    out = []
+    for kind in ("title", "end"):
+        spec = dict(C.get(kind) or {})
+        if vertical:
+            spec.update(seq.get(kind) or {})
+        if not spec.get("text"):
+            continue
+        d = float(spec.get("dur", 3.5))
+        at = float(spec["at"]) if kind == "title" else max(0.0, total - d - 0.2)
+        out.append((cached(work, kind, spec, width, height), at, d, min(0.8, d / 3), kind, spec["text"]))
+    if C.get("labels"):
+        shots = seq["shots"]
+        for i, s in enumerate(shots):
+            if not s.get("label"):
+                continue
+            cut = (starts[i] + tframes[i] / 2) / fps                       # where the shot reads as on screen
+            nxt = (starts[i + 1] + tframes[i + 1] / 2) / fps if i + 1 < len(shots) else total
+            d = min(2.5, nxt - cut - 0.8)
+            if d < 1.0:
+                continue
+            out.append((cached(work, "label", {"text": s["label"]}, width, height), cut + 0.4, d, 0.4, "label", s["label"]))
     return out
 
 

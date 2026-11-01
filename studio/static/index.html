@@ -114,6 +114,7 @@
           <label class="check"><input type="checkbox" name="versions" value="4k" checked><span>Landscape 4K</span></label>
           <label class="check"><input type="checkbox" name="versions" value="1080p"><span>Landscape 1080p</span></label>
           <label class="check"><input type="checkbox" name="versions" value="vertical"><span>Vertical short <small>1080×1920</small></span></label>
+          <label class="check"><input type="checkbox" id="capcut"><span>Also a CapCut project <small>ungraded, to finish by hand</small></span></label>
         </fieldset>
         <label class="field" id="vmaxField" hidden><span>Short: maximum length (seconds)</span>
           <input id="vertical_max_seconds" type="number" min="10" max="90" step="1" value="30"></label>
@@ -196,6 +197,7 @@
       <p id="jobError" class="error" hidden></p>
       <figure id="strip" class="strip" hidden><img alt="A frame from the middle of every clip"><figcaption>Your clips</figcaption></figure>
       <div id="outputs" class="outputs"></div>
+      <div id="capcutOut" class="outputs"></div>
       <div id="summary" class="summary" hidden></div>
       <section id="sheet" class="sheet" hidden aria-label="The cut, shot by shot"></section>
       <details id="cutBox" hidden><summary>Shot details: in points, speed, joins and why</summary><div class="cut-wrap"><table class="cut"><thead><tr><th>Shot</th><th>At</th><th>Clip</th><th>From</th><th>Length</th><th>Speed</th><th>Join</th><th>Why</th></tr></thead><tbody id="cutRows"></tbody></table></div></details>

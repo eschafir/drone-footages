@@ -186,11 +186,27 @@ A freeze is a shot whose source ran out (`in + dur * speed` past the end of the 
 (two tiles per shot) for wrong grades, a card over a busy area, or two shots that look alike. Hand over the paths of
 the 4K master and the vertical short, the music credit line if the licence needs one, and a one-line summary of the cut.
 
+## Export to CapCut (to finish by hand)
+
+```bash
+python3 $SK/capcut.py --cutlist $W/cutlist.json [--vertical] [--name "Lago Puelo"]
+```
+
+Writes a CapCut desktop project with the cut on the timeline: each shot points at the ORIGINAL source clip (ungraded,
+with the rest of the clip as handles), the cards as stills on an overlay track, the music (and SFX) with their fades.
+Also `$W/out/capcut[-vertical]/`: the LUT, cards, music and `CUT-SHEET.md` (every shot's source in/out and timeline
+place). Dissolves become cuts at their middle, the fades to black and card fades are left off, the LUT is not applied
+and the music is not normalised: the sheet lists each one for the user to add in CapCut. **CapCut must be quit**: it
+rewrites the drafts it has loaded, so the script refuses while it runs (exit 3, media folder still written). Rerunning
+replaces the draft it wrote (never a project made in CapCut). The draft skeletons are captured from CapCut 9.6
+(`assets/capcut-template/`); if a newer CapCut will not open the project, rebuild the edit from the cut sheet and
+recapture the template from a fresh CapCut project.
+
 ## Drone Studio (the UI)
 
 `python3 studio/server.py` (in the project folder) opens a local page: style (drone film / real estate, exterior
 only or interior & exterior), clips, music, colour, max length, title, end card or listing details and logo, room
-labels, notes, versions, output folder, **Create video**. Each job is a project folder in `studio-jobs/`. The edit step runs
+labels, notes, versions, an optional CapCut project, output folder, **Create video**. Each job is a project folder in `studio-jobs/`. The edit step runs
 `claude -p` headless in the job folder with `studio/prompts/edit.md`: Claude reads this file, looks at the sheets,
 writes `cut-spec.json` and runs build-cut.py until it passes. "Automatic" (or no `claude` CLI) uses plan-cut.py.
 

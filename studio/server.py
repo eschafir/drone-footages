@@ -176,7 +176,8 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/reveal":
                 j = MANAGER.jobs.get(data.get("id", ""))
                 target = data.get("path", "")
-                ok = j and any(o.get("delivered") == target or os.path.join(j.dir, o["file"]) == target for o in j.data["outputs"])
+                ok = j and (any(o.get("delivered") == target or os.path.join(j.dir, o["file"]) == target for o in j.data["outputs"]) or
+                            any(target in (c.get("draft"), c.get("media")) for c in j.data.get("capcut", [])))
                 if not ok or not os.path.exists(target):
                     return self.fail(404, "not a file of this job")
                 subprocess.run(["open", "-R", target])

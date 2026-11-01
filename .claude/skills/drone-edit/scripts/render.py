@@ -72,23 +72,16 @@ os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
 shots = seq["shots"]
 if not shots:
     common.die("no shots in the cutlist")
-# frame counts from the cumulative timeline, not shot by shot: rounding each shot alone drifts a frame every few
-# shots, and late cuts slide off the beat
-td = [0.0 if i == 0 or (s.get("transition") or {}).get("type", "cut") == "cut" else float(s["transition"].get("dur", 0.5))
-      for i, s in enumerate(shots)]
-pos = [0.0]
-for i in range(1, len(shots)):
-    pos.append(pos[-1] + float(shots[i - 1]["dur"]) - td[i])
-files, frames, tframes = [], [], []
+frames, tframes, starts, total_f = common.frame_timeline(shots)
+files = []
 for i, s in enumerate(shots):
     clip = clips.get(s["clip"]) or common.die("unknown clip %r in shot %d" % (s["clip"], i + 1))
     speed = float(s.get("speed", 1.0))
     dur = float(s["dur"])
-    n = int(round((pos[i] + dur) * FPS)) - int(round(pos[i] * FPS))
+    n = frames[i]
     span = dur * speed
     if s["in"] < 0 or s["in"] + span > clip["duration"] + 0.02:
         common.die("shot %d: %s %.2f + %.2f s at speed %.2f runs past the clip (%.2f s)" % (i + 1, s["clip"], s["in"], dur, speed, clip["duration"]))
-    tf = 0 if i == 0 else int(round((pos[i - 1] + float(shots[i - 1]["dur"])) * FPS)) - int(round(pos[i] * FPS))
     vf = []
     if args.vertical:
         x0, x1 = (s["pan"] if s.get("pan") else (s.get("x", 0.5), s.get("x", 0.5)))
@@ -109,17 +102,11 @@ for i, s in enumerate(shots):
                       "-vf", ",".join(vf), "-frames:v", n, *common.encode_args(preview=args.preview, mezzanine=True),
                       *common.TAG_ARGS, path + ".part.mp4")
         shutil.move(path + ".part.mp4", path)
-    files.append(path); frames.append(n); tframes.append(tf)
+    files.append(path)
     if args.progress:
         print("PROGRESS %d/%d shots" % (i + 1, len(shots) + 1), flush=True)
 
 # ---- timeline (frame exact)
-starts, acc = [], 0
-for i, n in enumerate(frames):
-    start = acc - tframes[i]
-    starts.append(start)
-    acc = start + n
-total_f = acc
 total = total_f / FPS
 fade_in, fade_out = float(C.get("fade_in", 1.0)), float(C.get("fade_out", 1.5))
 black_ok = [[0.0, fade_in]] if fade_in else []
@@ -134,34 +121,7 @@ for i, s in enumerate(shots):
 inputs = []
 for f in files:
     inputs += ["-i", f]
-cards = []
-for kind_ in ("title", "end"):
-    spec = dict(C.get(kind_) or {})
-    if args.vertical:
-        spec.update(seq.get(kind_) or {})
-    if not spec.get("text"):
-        continue
-    key = json.dumps([spec.get("text"), spec.get("sub"), spec.get("lines"), spec.get("logo"),
-                      os.path.getmtime(spec["logo"]) if spec.get("logo") and os.path.exists(spec["logo"]) else 0])
-    png = os.path.join(work, "card-%s-%dx%d-%s.png" % (kind_, W, H, hashlib.sha1(key.encode()).hexdigest()[:8]))
-    if not os.path.exists(png):
-        cardlib.render_card(kind_, spec["text"], spec.get("sub", ""), png, W, H, spec.get("lines") or (), spec.get("logo"))
-    d = float(spec.get("dur", 3.5))
-    at = float(spec["at"]) if kind_ == "title" else max(0.0, total - d - 0.2)
-    cards.append((png, at, d, min(0.8, d / 3)))
-if C.get("labels"):
-    for i, s in enumerate(shots):
-        if not s.get("label"):
-            continue
-        cut = (starts[i] + tframes[i] / 2) / FPS                       # where the shot reads as on screen
-        nxt = (starts[i + 1] + tframes[i + 1] / 2) / FPS if i + 1 < len(shots) else total
-        d = min(2.5, nxt - cut - 0.8)
-        if d < 1.0:
-            continue
-        png = os.path.join(work, "card-label-%dx%d-%s.png" % (W, H, hashlib.sha1(s["label"].encode()).hexdigest()[:8]))
-        if not os.path.exists(png):
-            cardlib.render_card("label", s["label"], "", png, W, H)
-        cards.append((png, cut + 0.4, d, 0.4))
+cards = [c[:4] for c in cardlib.placements(C, seq, args.vertical, starts, tframes, total, work, W, H)]
 for png, at, d, fd in cards:
     inputs += ["-loop", "1", "-framerate", str(FPS), "-t", "%.3f" % d, "-i", png]
 

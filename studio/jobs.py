@@ -1,6 +1,6 @@
 """jobs.py: one job = one drone-edit project folder in studio-jobs/, run stage by stage in a background thread.
 State lives in <job>/job.json (rewritten on every change) and the full output of every step in <job>/job.log.
-Stages: ingest -> analyze -> music -> edit -> render (one per version, with verify) -> deliver.
+Stages: ingest -> analyze -> music -> edit -> render (one per version, with verify) -> CapCut project (optional) -> deliver.
 "Edit again" (revise) re-runs from the edit stage; render.py's shot cache keeps unchanged shots."""
 import datetime, json, os, queue, re, shutil, signal, subprocess, sys, threading, time
 
@@ -17,6 +17,7 @@ VERSIONS = {"4k": "16:9 · 4K", "1080p": "16:9 · 1080p", "vertical": "9:16 · 1
 STYLES = ("drone", "realestate")
 FOOTAGE = ("exterior", "mixed")                 # real estate: exterior only, or interior & exterior
 COLOURS = ("auto", "dlogm", "rec709", "graded")
+CAPCUT_RUNNING = 3                              # capcut.py's exit code when CapCut is open: media written, draft not
 LISTING = {"price": 30, "beds": 6, "baths": 6, "area": 12, "area_unit": 6, "brokerage": 60, "phone": 30, "email": 80, "website": 80}
 
 
@@ -86,6 +87,7 @@ def validate(s):
         "style": s.get("style") if s.get("style") in STYLES else "drone",
         "footage": s.get("footage") if s.get("footage") in FOOTAGE else "mixed",
         "labels": bool(s.get("labels")),
+        "capcut": bool(s.get("capcut")),
         "colour": s.get("colour") if s.get("colour") in COLOURS else "auto",
         "listing": {k: re.sub(r"\s+", " ", str((s.get("listing") or {}).get(k, ""))).strip()[:n] for k, n in LISTING.items()},
         "notes": str(s.get("notes", "")).strip()[:4000],
@@ -273,8 +275,9 @@ class Job:
         return os.path.join(self.dir, "music", files[0]) if files else None
 
     # ---- running a step
-    def run(self, key, cmd, expect=None, pattern=None, cwd=None):
-        """Run one command, stream its output to the log, turn matching lines into stage progress."""
+    def run(self, key, cmd, expect=None, pattern=None, cwd=None, allow=()):
+        """Run one command, stream its output to the log, turn matching lines into stage progress. Exit codes in
+        allow are not failures; the code is left in self.exit_code."""
         if self.cancel_flag:
             raise Cancelled()
         self.log("$ " + " ".join(cmd))
@@ -293,14 +296,33 @@ class Job:
         code = self.proc.wait()
         self.proc.stdout.close()
         self.proc = None
+        self.exit_code = code
         if self.cancel_flag:
             raise Cancelled()
-        if code:
+        if code and code not in allow:
             raise StageFailed("%s failed (exit %d):\n%s" % (os.path.basename(cmd[1]) if len(cmd) > 1 else cmd[0], code, "\n".join(tail)))
         return "\n".join(tail)
 
     def py(self, script, *args):
         return [sys.executable, os.path.join(SCRIPTS, script)] + [str(a) for a in args]
+
+    def capcut(self):
+        """The edit as a CapCut project on the ungraded source clips (capcut.py), the 16:9 cut and, if the short
+        was rendered, the 9:16 one. CapCut open is a warning, not a failure: the media folder is still written."""
+        s = self.data["settings"]
+        self.stage("capcut", state="running")
+        cl = os.path.join(self.dir, "cutlist.json")
+        drafts, blocked = [], False
+        for vertical in ([False, True] if "vertical" in s["versions"] else [False]):
+            args = ["--cutlist", cl, "--name", s["title"]] + (["--vertical"] if vertical else [])
+            out = self.run("capcut", self.py("capcut.py", *args), allow=(CAPCUT_RUNNING,))
+            blocked = blocked or self.exit_code == CAPCUT_RUNNING
+            m = re.search(r"CapCut project '[^']*': .* -> (.+)$", out, re.M)
+            drafts.append({"label": "CapCut project · " + ("9:16" if vertical else "16:9"), "draft": m.group(1).strip() if m else None,
+                           "media": os.path.join(self.dir, "out", "capcut-vertical" if vertical else "capcut")})
+            self.update(capcut=drafts)
+        self.stage("capcut", state="warn" if blocked else "done", progress=1.0,
+                   detail="CapCut was open: quit it, then Edit again (the media folder is ready)" if blocked else "open CapCut to edit")
 
     def cancel(self):
         self.cancel_flag = True
@@ -315,7 +337,9 @@ class Job:
     def plan_stages(self, from_edit=False):
         s = self.data["settings"]
         keys = ([] if from_edit else [("ingest", "Prepare clips"), ("analyze", "Analyze footage"), ("music", "Read the music")])
-        keys += [("edit", "Edit")] + [("render-" + v, "Render " + VERSIONS[v]) for v in s["versions"]] + [("deliver", "Deliver")]
+        keys += [("edit", "Edit")] + [("render-" + v, "Render " + VERSIONS[v]) for v in s["versions"]]
+        keys += [("capcut", "CapCut project")] if s.get("capcut") else []
+        keys += [("deliver", "Deliver")]
         old = {x["key"]: x for x in self.data["stages"]}
         self.data["stages"] = ([old[k] for k in ("ingest", "analyze", "music") if from_edit and k in old] +
                                [{"key": k, "label": l, "state": "pending", "progress": 0.0, "detail": ""} for k, l in keys])
@@ -324,7 +348,7 @@ class Job:
     def execute(self, from_edit=False):
         s = self.data["settings"]
         self.cancel_flag = False
-        self.update(state="running", error=None, activity="", outputs=[] if not from_edit else self.data["outputs"])
+        self.update(state="running", error=None, activity="", outputs=[] if not from_edit else self.data["outputs"], capcut=[])
         current = None
         try:
             if not from_edit:
@@ -391,6 +415,10 @@ class Job:
                 self.update(outputs=outputs)
                 self.stage(key, state="done" if vr.returncode == 0 else "warn", progress=1.0,
                            detail="verified" if vr.returncode == 0 else "verify found problems")
+
+            if s.get("capcut"):
+                current = "capcut"
+                self.capcut()
 
             current = "deliver"
             self.stage("deliver", state="running")

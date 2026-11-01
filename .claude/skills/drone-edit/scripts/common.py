@@ -179,6 +179,25 @@ def grade_vf(lut, look=None, profile="dlogm"):
     return ",".join(f)
 
 
+def frame_timeline(shots):
+    """Frame-exact placement of a cutlist's shots: (frames, tframes, starts, total_frames). frames[i] is shot i's length,
+    tframes[i] the overlap of its transition with the shot before (0 for a cut), starts[i] its first frame. Counted
+    from the cumulative timeline, not shot by shot: rounding each shot alone drifts a frame every few shots, and late
+    cuts slide off the beat."""
+    td = [0.0 if i == 0 or (s.get("transition") or {}).get("type", "cut") == "cut" else float(s["transition"].get("dur", 0.5))
+          for i, s in enumerate(shots)]
+    pos = [0.0]
+    for i in range(1, len(shots)):
+        pos.append(pos[-1] + float(shots[i - 1]["dur"]) - td[i])
+    frames = [int(round((pos[i] + float(s["dur"])) * FPS)) - int(round(pos[i] * FPS)) for i, s in enumerate(shots)]
+    tframes = [0] + [int(round((pos[i - 1] + float(shots[i - 1]["dur"])) * FPS)) - int(round(pos[i] * FPS)) for i in range(1, len(shots))]
+    starts, acc = [], 0
+    for n, tf in zip(frames, tframes):
+        starts.append(acc - tf)
+        acc = starts[-1] + n
+    return frames, tframes, starts, acc
+
+
 def cutlist_skeleton(project, beats=None, music_start=0.0, title="[TITLE]", sub="[LOCATION · DATE]",
                      end="[YOUR NAME]", end_sub=None, style=None, end_lines=(), logo=None, labels=False):
     """Everything in a cutlist except the shots: grade, fades, music, cards (plan-cut.py and build-cut.py share it).

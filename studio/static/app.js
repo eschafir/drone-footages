@@ -39,7 +39,7 @@ function remember() {
   const v = {};
   FIELDS.forEach((f) => { v[f] = $(f).value; });
   v.clips_mode = radio("clips_mode"); v.music_mode = radio("music_mode"); v.style = radio("style"); v.footage = radio("footage");
-  v.labels = $("labels").checked;
+  v.labels = $("labels").checked; v.capcut = $("capcut").checked;
   v.versions = [...document.querySelectorAll("input[name=versions]:checked")].map((x) => x.value);
   try { localStorage.setItem(STORE, JSON.stringify(v)); } catch (e) { /* private mode: fine */ }
 }
@@ -49,6 +49,7 @@ function restore() {
   if (!v) return;
   FIELDS.forEach((f) => { if (v[f] !== undefined && v[f] !== null) $(f).value = v[f]; });
   if (typeof v.labels === "boolean") $("labels").checked = v.labels;
+  if (typeof v.capcut === "boolean") $("capcut").checked = v.capcut;
   for (const name of ["clips_mode", "music_mode", "style", "footage"]) {
     const el = document.querySelector(`input[name=${name}][value="${v[name]}"]`);
     if (el) el.checked = true;
@@ -83,7 +84,7 @@ function settings() {
     quality: $("quality").value, editor: $("editor").value,
     title: $("title").value, sub: $("sub").value, end: $("end").value, end_sub: $("end_sub").value,
     notes: $("notes").value, output_dir: $("output_dir").value,
-    style: radio("style"), footage: radio("footage"), labels: $("labels").checked, colour: $("colour").value,
+    style: radio("style"), footage: radio("footage"), labels: $("labels").checked, capcut: $("capcut").checked, colour: $("colour").value,
     listing: Object.fromEntries(LISTING.map((k) => [k, $("l_" + k).value])),
   };
   if (s.style === "realestate") s.end = $("agent").value;
@@ -166,7 +167,7 @@ function showJob(id, title, state) {
   $("empty").hidden = true; $("job").hidden = false;
   $("jobTitle").textContent = title || "";
   $("jobState").textContent = state || "";
-  $("stages").innerHTML = ""; $("outputs").innerHTML = ""; $("summary").hidden = true; $("cutBox").hidden = true;
+  $("stages").innerHTML = ""; $("outputs").innerHTML = ""; $("capcutOut").innerHTML = ""; $("capcutOut").dataset.key = ""; $("summary").hidden = true; $("cutBox").hidden = true;
   $("revise").hidden = true; $("jobError").hidden = true; $("activity").hidden = true; $("strip").hidden = true;
   $("strip").dataset.src = ""; $("sheet").hidden = true; $("sheet").dataset.key = "";
 }
@@ -245,6 +246,15 @@ function renderJob(j) {
         <span>${mb(o.size)}</span>
         ${o.delivered ? `<button type="button" class="ghost" data-reveal="${esc(o.delivered)}">Show in Finder</button>` : ""}
         ${o.delivered ? `<span class="path-text">${esc(o.delivered)}</span>` : ""}</div></div>`).join("");
+  }
+  const ccKey = JSON.stringify(j.capcut || []);
+  if ($("capcutOut").dataset.key !== ccKey) {
+    $("capcutOut").dataset.key = ccKey;
+    $("capcutOut").innerHTML = (j.capcut || []).map((c) => `<div class="out"><div class="meta"><strong>${esc(c.label)}</strong>
+        ${c.draft ? `<span class="badge ok">in CapCut</span>` : `<span class="badge bad">not written: quit CapCut, then Edit again</span>`}
+        ${c.draft ? `<button type="button" class="ghost" data-reveal="${esc(c.draft)}">Show project</button>` : ""}
+        <button type="button" class="ghost" data-reveal="${esc(c.media)}">Show media &amp; cut sheet</button>
+        <span class="path-text">${esc(c.draft || c.media)}</span></div></div>`).join("");
   }
   if (j.cut && j.cut.shots) {
     $("cutBox").hidden = false;
